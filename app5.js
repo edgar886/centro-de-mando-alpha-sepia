@@ -24,10 +24,19 @@ const laEn=f=>{const n=laDias(f);if(n==null)return "";if(n===0)return "hoy";if(n
 const laHora=t=>{const d=new Date(t);return isNaN(d)?"":d.toLocaleTimeString("es-MX",{hour:"numeric",minute:"2-digit"});};
 
 
-
 const laNum=v=>{if(v==null||v==="")return null;const n=Number(v);return Number.isFinite(n)?n:null;};
+const laChem=q=>{
+  if(q==null||q==="")return "";
+  if(typeof q==="string")return q;
+  if(typeof q!=="object")return String(q);
+  const bits=[];
+  for(const [k,lab] of [["ph","pH"],["cloro","Cl"],["chlorine","Cl"],["bromo","Br"],["bromine","Br"],["alcalinidad","Alk"],["alkalinity","Alk"],["estado","estado"],["status","estado"],["nota","nota"],["note","nota"],["ok","estado"]]){
+    if(q[k]!=null&&q[k]!=="") bits.push(lab+" "+q[k]);
+  }
+  return bits.length?bits.join(" · "):"";
+};
 const laLock=casa=>{
-  const L=casa.lock||casa.cerradura||casa.chapa||casa.nest_lock||casa.estado_lock;
+  const L=casa.lock||casa.cerradura||casa.chapa||casa.nest_lock;
   if(L==null||L==="")return null;
   if(typeof L==="boolean")return L?"locked":"unlocked";
   if(typeof L==="string"){
@@ -45,97 +54,71 @@ const laLock=casa=>{
   }
   return null;
 };
-const laBadgeClass=st=>{
-  st=String(st||"").toLowerCase();
-  if(st==="ok"||st==="normal"||st==="good") return "ok";
-  if(st==="alto"||st==="high"||st==="hi") return "alto";
-  if(st==="bajo"||st==="low"||st==="lo") return "bajo";
-  return "off";
-};
-function laChemRows(casa, jac){
-  const q=jac.quimicos??jac.chemicals??casa.quimicos??casa.jacuzzi_chemicals??null;
-  const rows=[];
-  if(Array.isArray(q)){
-    for(const row of q){
-      if(!row||typeof row!=="object") continue;
-      const label=row.label||row.nombre||row.name||"";
-      const valor=row.valor??row.value??row.val;
-      const estado=row.estado||row.status||"";
-      const hacer=row.hacer||row.accion||row.action||"";
-      if((valor==null||valor==="") && !estado && !hacer && !label) continue;
-      rows.push({label, valor, estado, hacer});
-    }
-    return rows;
-  }
-  if(q && typeof q==="string" && q.trim()) return [{label:"Químicos", valor:q, estado:"", hacer:""}];
-  if(q && typeof q==="object"){
-    /* legacy object shape — map known keys only, NEVER Object.entries dump */
-    const map=[
-      {k:"ph", label:"pH", st:"ph_status", ac:"ph_accion"},
-      {k:"chlorine", label:"Cloro", st:"chlorine_status", ac:"chlorine_accion", alt:"cloro"},
-      {k:"orp", label:"ORP", st:"orp_status", ac:"orp_accion"}
-    ];
-    for(const m of map){
-      const valor=q[m.k]??(m.alt?q[m.alt]:null);
-      const estado=q[m.st]||"";
-      const hacer=q[m.ac]||"";
-      if(valor==null||valor===""){
-        if(!estado && !hacer) continue;
-      }
-      rows.push({label:m.label, valor, estado, hacer});
-    }
-  }
-  return rows;
-}
 function laRenderCasa(casa){
   if(casa==null) casa={};
   if(Array.isArray(casa)) casa={alertas:casa};
   const al=Array.isArray(casa.alertas)?casa.alertas:(Array.isArray(casa.alerts)?casa.alerts:[]);
   const jac=casa.jacuzzi||casa.spa||casa.hotspring||{};
-  const jTemp=laNum(jac.temp??jac.temperatura??casa.jacuzzi_temp??casa.spa_temp??casa.temperatura_jacuzzi_f);
+  const chem=jac.chemicals||jac.quimicos||jac.quim||casa.jacuzzi_chemicals||casa.quimicos||{};
+  const jTemp=laNum(jac.temp??jac.temperatura??casa.jacuzzi_temp??casa.spa_temp);
   const jUnit=(jac.unit||jac.unidad||casa.jacuzzi_unit||"°F")+"";
-  const hTemp=laNum(casa.temperatura_casa_f??casa.temp??casa.casa_temp??casa.house_temp??casa.thermostat??(casa.ecobee&&casa.ecobee.temp));
+  const hTemp=laNum(casa.temp??casa.casa_temp??casa.house_temp??casa.thermostat??(casa.ecobee&&casa.ecobee.temp)??(casa.humidity==null?null:null)??(casa.ecobee&&casa.ecobee.temperature));
   const hUnit=(casa.temp_unit||casa.unidad_temp||"°F")+"";
+  const hum=laNum(casa.humidity??casa.humedad??(casa.ecobee&&casa.ecobee.humidity));
   const lock=laLock(casa);
-  const chemRows=laChemRows(casa, jac);
-  const resumen=casa.quimicos_resumen||jac.quimicos_resumen||(jac.quimicos&&jac.quimicos.resumen)||"";
-
-  let lV="—", lOpen=false, lEmpty=true;
-  if(lock){
-    lEmpty=false;
-    lOpen=String(lock).toLowerCase()==="unlocked";
-    lV=lOpen?"Unlocked":(String(lock).toLowerCase()==="locked"?"Locked":String(lock));
-  }
   const jV=jTemp!=null?(jTemp+(jUnit.startsWith("°")?jUnit:" "+jUnit)):"—";
   const hV=hTemp!=null?(hTemp+(hUnit.startsWith("°")?hUnit:" "+hUnit)):"—";
-
-  /* Top row: LOCK | CASA temp (casa always to the RIGHT of lock) */
-  let html='<div class="la-toprow">';
-  html+='<div class="la-lock'+(lOpen?" open":"")+(lEmpty?" empty":"")+'"><span class="ico" aria-hidden="true">'+(lEmpty?"·":(lOpen?"🔓":"🔒"))+'</span><span class="v">'+esc(lV)+'</span></div>';
-  html+='<div class="la-house'+(hTemp==null?" empty":"")+'"><div class="k">Casa</div><div class="v">'+esc(hV)+"</div></div>";
-  html+="</div>";
-
-  /* Jacuzzi big temp */
-  html+='<div class="la-jacuzzi'+(jTemp==null?" empty":"")+'"><div class="k">Jacuzzi</div><div class="v">'+esc(jV)+"</div></div>";
-
-  /* Chem rows — clean, never raw keys */
-  if(chemRows.length){
-    html+='<div class="la-chemlist">';
-    for(const row of chemRows){
-      const st=String(row.estado||"").toLowerCase();
-      const hasVal=row.valor!=null&&row.valor!=="";
-      const badge=st?('<span class="la-badge '+laBadgeClass(st)+'">'+esc(st)+"</span>"):"";
-      const accion=st&&st!=="ok"&&row.hacer?('<span class="la-accion">'+esc(String(row.hacer))+"</span>"):"";
-      html+='<div class="la-chemrow"><span class="lab">'+esc(String(row.label||""))+'</span><span class="val">'+(hasVal?esc(String(row.valor)):"—")+"</span>"+badge+accion+"</div>";
-    }
-    html+="</div>";
-  }else{
-    html+='<div class="la-chemlist empty"><div class="la-chemrow empty"><span class="lab">Químicos</span><span class="val">—</span><span class="la-accion">sin lectura</span></div></div>';
+  let lV="—", lS="sin lectura", lBad=false;
+  if(lock){
+    const open=String(lock).toLowerCase()==="unlocked";
+    lV=open?"Unlocked":(String(lock).toLowerCase()==="locked"?"Locked":String(lock));
+    lS=open?"abierta":"cerrada";
+    lBad=open;
   }
-  if(resumen) html+='<div class="la-note">'+esc(String(resumen))+"</div>";
+  /* Order: Jacuzzi temp | Chemicals | Lock | House temp (house ALWAYS to the right of Lock) */
+  let html='<div class="la-metrics la-metrics-4">';
+  html+='<div class="la-metric'+(jTemp==null?" empty":"")+'"><div class="k">Jacuzzi</div><div class="v">'+esc(jV)+'</div><div class="s">'+(jTemp!=null?"temp":"sin lectura")+"</div></div>";
+  html+='<div class="la-metric la-chem'+(typeof chem==="object"&&chem&& (chem.ph!=null||chem.chlorine!=null||chem.cloro!=null||chem.orp!=null)?"":" empty")+'"><div class="k">Químicos</div>'+laChemBlock(chem)+"</div>";
+  html+='<div class="la-metric'+(lBad?" bad":"")+(!lock?" empty":"")+'"><div class="k">Lock</div><div class="v">'+esc(lV)+'</div><div class="s">'+esc(lS)+"</div></div>";
+  html+='<div class="la-metric'+(hTemp==null?" empty":"")+'"><div class="k">Casa</div><div class="v">'+esc(hV)+'</div><div class="s">'+(hTemp!=null?(hum!=null?"humedad "+hum+"%":"interior"):"sin lectura")+"</div></div>";
+  html+="</div>";
+  if(typeof chem==="object"&&chem&&chem.resumen) html+='<div class="la-note">'+esc(String(chem.resumen))+"</div>";
   if(casa.texto&&!/^ok$/i.test(casa.texto)) html+='<div class="la-note">'+esc(casa.texto)+"</div>";
+  if(casa.spa_cover||casa.cover||jac.cover){
+    const cov=casa.spa_cover||casa.cover||jac.cover;
+    html+='<div class="la-note">Cover: '+esc(typeof cov==="string"?cov:(cov.estado||cov.status||JSON.stringify(cov)))+"</div>";
+  }
   if(al.length) html+='<ul class="la-l la-alerts">'+al.map(x=>'<li class="la-bad">'+esc(typeof x==="string"?x:(x.texto||x.msg||x.message||JSON.stringify(x)))+"</li>").join("")+"</ul>";
   return html;
+}
+function laChemBlock(chem){
+  if(chem==null||chem==="") chem={};
+  if(typeof chem==="string") return '<div class="v">'+esc(chem)+'</div>';
+  if(typeof chem!=="object") return '<div class="v">'+esc(String(chem))+"</div>";
+  const rows=[];
+  const specs=[
+    {k:"ph", label:"pH", st:"ph_status", ac:"ph_accion"},
+    {k:"chlorine", label:"Cl", st:"chlorine_status", ac:"chlorine_accion", alt:"cloro"},
+    {k:"orp", label:"ORP", st:"orp_status", ac:"orp_accion"}
+  ];
+  for(const sp of specs){
+    const val=chem[sp.k]??(sp.alt?chem[sp.alt]:null);
+    const st=String(chem[sp.st]||"").toLowerCase();
+    const ac=chem[sp.ac]||"";
+    const has=val!=null&&val!=="";
+    const badge=st?('<span class="la-badge '+laChemClass(st)+'">'+esc(st)+"</span>"):"";
+    const accion=st&&st!=="ok"&&ac?('<span class="la-accion">'+esc(ac)+"</span>"):"";
+    rows.push('<div class="la-chemrow'+(has?"":" empty")+'"><span class="lab">'+sp.label+'</span><span class="val">'+(has?esc(String(val)):"—")+"</span>"+badge+accion+"</div>");
+  }
+  /* Always show pH / Cl / ORP rows — never collapse to green OK or hide nulls */
+  return '<div class="la-chemlist">'+rows.join("")+"</div>";
+}
+function laChemClass(st){
+  st=String(st||"").toLowerCase();
+  if(st==="ok"||st==="normal"||st==="good") return "ok";
+  if(st==="alto"||st==="high"||st==="hi") return "alto";
+  if(st==="bajo"||st==="low"||st==="lo") return "bajo";
+  return "off";
 }
 
 function renderLA(){
