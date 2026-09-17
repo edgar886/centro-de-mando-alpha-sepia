@@ -92,7 +92,7 @@ function laRenderCasa(casa){
   return html;
 }
 function laChemBlock(chem){
-  if(chem==null||chem==="") return '<div class="v">—</div><div class="s">sin lectura</div>';
+  if(chem==null||chem==="") chem={};
   if(typeof chem==="string") return '<div class="v">'+esc(chem)+'</div>';
   if(typeof chem!=="object") return '<div class="v">'+esc(String(chem))+"</div>";
   const rows=[];
@@ -110,11 +110,7 @@ function laChemBlock(chem){
     const accion=st&&st!=="ok"&&ac?('<span class="la-accion">'+esc(ac)+"</span>"):"";
     rows.push('<div class="la-chemrow'+(has?"":" empty")+'"><span class="lab">'+sp.label+'</span><span class="val">'+(has?esc(String(val)):"—")+"</span>"+badge+accion+"</div>");
   }
-  if(!rows.some((_,i)=>{const sp=specs[i]; const val=chem[sp.k]??(sp.alt?chem[sp.alt]:null); return val!=null&&val!=="";}) && !chem.resumen){
-    const fallback=laChem(chem);
-    if(fallback) return '<div class="v">'+esc(fallback)+"</div>";
-    return '<div class="v">—</div><div class="s">sin lectura</div>';
-  }
+  /* Always show pH / Cl / ORP rows — never collapse to green OK or hide nulls */
   return '<div class="la-chemlist">'+rows.join("")+"</div>";
 }
 function laChemClass(st){
