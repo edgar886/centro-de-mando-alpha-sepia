@@ -374,19 +374,27 @@ label.f>span{display:block;font-family:var(--sans);font-size:12px;letter-spacing
 .la-jacuzzi .v{font-size:32px;line-height:1.05;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
 .la-jacuzzi .s{margin-top:4px;font-size:13px;color:var(--muted)}
 .la-jacuzzi.empty .v{color:var(--muted);font-weight:500;font-size:22px}
+
 .la-chemlist{display:flex;flex-direction:column;gap:8px;margin:2px 0 6px}
 .la-chemlist.empty{opacity:.9}
+.la-chemchip{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;width:100%;text-align:left;padding:10px 12px;background:var(--surface2);border:1px solid var(--line);border-radius:8px;cursor:default;font:inherit;color:inherit}
+.la-chemchip.tap{cursor:pointer}
+.la-chemchip.tap:hover{border-color:color-mix(in srgb,var(--ink) 25%,var(--line))}
+.la-chemchip.needs{border-color:color-mix(in srgb,#C4A35A 50%,var(--line))}
+.la-chemchip.b-alto{border-color:color-mix(in srgb,#B0533D 45%,var(--line))}
+.la-chemchip.b-bajo{border-color:color-mix(in srgb,#C4A35A 50%,var(--line))}
+.la-chemchip.b-ok{border-color:color-mix(in srgb,#5E8B62 40%,var(--line))}
+.la-chemlabel{font-size:15px;font-weight:600;color:var(--ink);flex:1 1 auto}
+.la-chip-hint{font-size:12px;color:var(--muted);margin-left:auto}
+.la-chip-detail{font-size:14px;line-height:1.45;color:var(--muted);padding:8px 12px 4px;margin:-2px 0 4px;border-left:3px solid color-mix(in srgb,#C4A35A 55%,var(--line));background:color-mix(in srgb,var(--surface2) 80%,transparent);border-radius:0 6px 6px 0}
 .la-chemrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:8px 10px;background:var(--surface2);border:1px solid var(--line);border-radius:6px}
 .la-chemrow.needs{border-color:color-mix(in srgb,#C4A35A 50%,var(--line))}
-.la-chemrow .lab{font-family:var(--sans);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;min-width:72px}
-.la-chemrow .val{font-size:18px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;min-width:48px}
+.la-chemline{font-size:15px;font-weight:600;color:var(--ink)}
 .la-badge{font-family:var(--sans);font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;padding:3px 8px;border-radius:999px;border:1px solid var(--line)}
 .la-badge.ok{background:color-mix(in srgb,#5E8B62 18%,transparent);color:#2C4E30;border-color:color-mix(in srgb,#5E8B62 40%,var(--line))}
 .la-badge.alto{background:color-mix(in srgb,#B0533D 16%,transparent);color:#7A3826;border-color:color-mix(in srgb,#B0533D 40%,var(--line))}
-.la-badge.bajo{background:color-mix(in srgb,#C4A35A 20%,transparent);color:#7A5A16;border-color:color-mix(in srgb,#C4A35A 45%,var(--line))}
-.la-badge.revisar{background:color-mix(in srgb,#C4A35A 22%,transparent);color:#7A5A16;border-color:color-mix(in srgb,#C4A35A 50%,var(--line))}
+.la-badge.bajo,.la-badge.revisar{background:color-mix(in srgb,#C4A35A 20%,transparent);color:#7A5A16;border-color:color-mix(in srgb,#C4A35A 45%,var(--line))}
 .la-badge.off{color:var(--muted)}
-.la-accion{font-size:14px;color:var(--muted)}
 .la-dosewrap{flex:1 1 100%;display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:2px}
 .la-dose{font-size:15px;font-weight:600;color:var(--ink)}
 .la-dose-tog{font-family:var(--sans);font-size:12px;line-height:1;padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer}

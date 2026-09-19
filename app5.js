@@ -84,24 +84,48 @@ const laIsOk = st => {
   st = String(st || "").toLowerCase();
   return !st || st === "ok" || st === "normal" || st === "good" || st === "verde";
 };
-/** Mike sends jacuzzi.quimicos as string[] only. Never Object.entries / String(obj) → [object Object]. */
-function laChemLines(casa, jac) {
+/** Mike: jacuzzi.quimicos = [{label,badge,detalle}] or string[] fallback. Never String(obj). */
+function laChemChips(casa, jac) {
   const q = jac.quimicos ?? jac.chemicals ?? casa.quimicos ?? null;
   const out = [];
+  const pushChip = (label, badge, detalle) => {
+    label = String(label || "").trim();
+    if (!label || label === "[object Object]") return;
+    badge = String(badge || "").trim().toLowerCase();
+    detalle = String(detalle || "").trim();
+    if (detalle === "[object Object]") detalle = "";
+    out.push({ label, badge, detalle });
+  };
   if (Array.isArray(q)) {
     for (const item of q) {
       if (item == null || item === "") continue;
       if (typeof item === "string") {
         const t = item.trim();
-        if (t && t !== "[object Object]") out.push(t);
+        if (t && t !== "[object Object]") pushChip(t, "", "");
         continue;
       }
-      /* objects are a bug in the payload — skip; never coerce to String(obj) */
+      if (typeof item === "object") {
+        const label = item.label || item.etiqueta || item.nombre || item.name || "";
+        const badge = item.badge || item.estado || item.status || "";
+        const detalle = item.detalle || item.detail || item.hacer || item.accion || "";
+        /* only structured chip fields — never dump keys */
+        if (label) pushChip(label, badge, detalle);
+      }
     }
     return out;
   }
-  if (typeof q === "string" && q.trim() && q.trim() !== "[object Object]") return [q.trim()];
-  return [];
+  if (typeof q === "string" && q.trim() && q.trim() !== "[object Object]") {
+    pushChip(q.trim(), "", "");
+  }
+  return out;
+}
+const laChipClass = badge => {
+  badge = String(badge || "").toLowerCase();
+  if (badge === "ok" || badge === "normal" || badge === "good" || badge === "verde") return "ok";
+  if (badge === "alto" || badge === "high" || badge === "hi") return "alto";
+  if (badge === "bajo" || badge === "low" || badge === "lo") return "bajo";
+  if (badge === "revisar" || badge === "warn" || badge === "warning") return "revisar";
+  return "off";
 }
 /** Alertas: only dose lines (→ / oz / producto). Drop "mide antes", cartridge, water-change noise. */
 function laAlertas(casa) {
@@ -137,7 +161,7 @@ function laRenderCasa(casa) {
   const casaTexto = laTxt(casa.casa_texto || casa.texto_casa || "");
   const hUnit = "°F";
   const lock = laLock(casa);
-  const chemLines = laChemLines(casa, jac);
+  const chemChips = laChemChips(casa, jac);
   const jacNota = laTxt(jac.nota || casa.nota || "");
   const resumen = laTxt(jac.quimicos_resumen || casa.quimicos_resumen || "");
   const alertas = laAlertas(casa);
@@ -180,11 +204,22 @@ function laRenderCasa(casa) {
 
   html += '<div class="la-jacuzzi' + (jTemp == null ? " empty" : "") + '"><div class="k">Jacuzzi</div><div class="v">' + esc(jV) + '</div><div class="s">' + esc(jSub) + "</div></div>";
 
-  if (chemLines.length) {
+  if (chemChips.length) {
     html += '<div class="la-chemlist">';
-    for (const line of chemLines) {
-      const needs = /\b(alto|bajo|revisar)\b/i.test(line);
-      html += '<div class="la-chemrow line' + (needs ? " needs" : "") + '"><span class="la-chemline">' + esc(line) + "</span></div>";
+    for (let i = 0; i < chemChips.length; i++) {
+      const chip = chemChips[i];
+      const bcls = laChipClass(chip.badge);
+      const needs = bcls === "alto" || bcls === "bajo" || bcls === "revisar";
+      const hasDet = !!chip.detalle;
+      const clickable = hasDet;
+      html += '<button type="button" class="la-chemchip' + (needs ? " needs" : "") + (clickable ? " tap" : "") + (bcls !== "off" ? " b-" + bcls : "") + '"' + (clickable ? ' data-la-chip="' + i + '" aria-expanded="false"' : " disabled") + '>';
+      html += '<span class="la-chemlabel">' + esc(chip.label) + "</span>";
+      if (chip.badge) html += '<span class="la-badge ' + bcls + '">' + esc(chip.badge) + "</span>";
+      if (clickable) html += '<span class="la-chip-hint" aria-hidden="true">▾</span>';
+      html += "</button>";
+      if (hasDet) {
+        html += '<div class="la-chip-detail" data-la-chip-detail="' + i + '" hidden>' + esc(chip.detalle) + "</div>";
+      }
     }
     html += "</div>";
   } else {
@@ -243,6 +278,24 @@ function renderLA() {
 }
 
 document.addEventListener("click", async e => {
+  const chipBtn = e.target.closest("[data-la-chip]");
+  if (chipBtn) {
+    e.preventDefault();
+    const id = chipBtn.getAttribute("data-la-chip");
+    const list = chipBtn.closest(".la-chemlist");
+    const det = list && list.querySelector('[data-la-chip-detail="' + id + '"]');
+    if (!det) return;
+    const open = det.hasAttribute("hidden");
+    /* close siblings */
+    list.querySelectorAll(".la-chip-detail").forEach(d => d.setAttribute("hidden", ""));
+    list.querySelectorAll("[data-la-chip]").forEach(b => { b.setAttribute("aria-expanded", "false"); const h=b.querySelector(".la-chip-hint"); if(h) h.textContent="▾"; });
+    if (open) {
+      det.removeAttribute("hidden");
+      chipBtn.setAttribute("aria-expanded", "true");
+      const h = chipBtn.querySelector(".la-chip-hint"); if (h) h.textContent = "▴";
+    }
+    return;
+  }
   const tog = e.target.closest(".la-dose-tog");
   if (tog) {
     e.preventDefault();
