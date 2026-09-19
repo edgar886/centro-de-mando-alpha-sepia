@@ -84,54 +84,24 @@ const laIsOk = st => {
   st = String(st || "").toLowerCase();
   return !st || st === "ok" || st === "normal" || st === "good" || st === "verde";
 };
-/** Prefer quimicos_filas; else quimicos as string lines; never Object.entries / [object Object]. */
-function laChemRows(casa, jac) {
-  const filas = jac.quimicos_filas || jac.quimicos_filas || casa.quimicos_filas || casa.quimicos_filas || null;
-  if (Array.isArray(filas) && filas.length) {
-    const rows = [];
-    for (const row of filas) {
-      if (!row || typeof row !== "object") continue;
-      const label = row.label || row.nombre || row.name || "";
-      const valor = row.valor ?? row.value ?? row.val;
-      const estado = row.estado || row.status || "";
-      const hacer = row.hacer || row.accion || row.action || "";
-      if ((valor == null || valor === "") && !estado && !hacer && !label) continue;
-      rows.push({ label, valor, estado, hacer, line: "" });
-    }
-    if (rows.length) return rows;
-  }
+/** Mike sends jacuzzi.quimicos as string[] only. Never Object.entries / String(obj) → [object Object]. */
+function laChemLines(casa, jac) {
   const q = jac.quimicos ?? jac.chemicals ?? casa.quimicos ?? null;
+  const out = [];
   if (Array.isArray(q)) {
-    const rows = [];
     for (const item of q) {
       if (item == null || item === "") continue;
       if (typeof item === "string") {
         const t = item.trim();
-        if (t) rows.push({ label: "", valor: "", estado: "", hacer: "", line: t });
+        if (t && t !== "[object Object]") out.push(t);
         continue;
       }
-      if (typeof item === "object") {
-        const label = item.label || item.nombre || item.name || "";
-        const valor = item.valor ?? item.value ?? item.val;
-        const estado = item.estado || item.status || "";
-        const hacer = item.hacer || item.accion || item.action || "";
-        if ((valor == null || valor === "") && !estado && !hacer && !label) continue;
-        rows.push({ label, valor, estado, hacer, line: "" });
-      }
-      /* never String(object) → [object Object] */
+      /* objects are a bug in the payload — skip; never coerce to String(obj) */
     }
-    return rows;
+    return out;
   }
-  if (typeof q === "string" && q.trim()) {
-    return [{ label: "", valor: "", estado: "", hacer: "", line: q.trim() }];
-  }
+  if (typeof q === "string" && q.trim() && q.trim() !== "[object Object]") return [q.trim()];
   return [];
-}
-function laDoseLine(row) {
-  if (laIsOk(row.estado)) return "";
-  const hacer = String(row.hacer || "").trim();
-  if (hacer) return hacer;
-  return "";
 }
 /** Alertas: only dose lines (→ / oz / producto). Drop "mide antes", cartridge, water-change noise. */
 function laAlertas(casa) {
@@ -156,7 +126,7 @@ function laAlertas(casa) {
 function laRenderCasa(casa) {
   if (casa == null) casa = {};
   if (Array.isArray(casa)) casa = { alertas: casa };
-  const jac = casa.jacuzzi || casa.spa || casa.hotspring || {};
+  const jac = casa.jacuzzi || casa.jacuzzi || casa.spa || casa.hotspring || {};
   const jTemp = laNum(jac.temp_f ?? jac.temp ?? jac.temperatura ?? casa.jacuzzi_temp ?? casa.spa_temp);
   const jSet = laNum(jac.set_f ?? jac.setpoint ?? jac.set);
   const jGal = laNum(jac.galones ?? jac.gallons ?? casa.galones ?? casa.jacuzzi_galones);
@@ -167,7 +137,8 @@ function laRenderCasa(casa) {
   const casaTexto = laTxt(casa.casa_texto || casa.texto_casa || "");
   const hUnit = "°F";
   const lock = laLock(casa);
-  const chemRows = laChemRows(casa, jac);
+  const chemLines = laChemLines(casa, jac);
+  const jacNota = laTxt(jac.nota || casa.nota || "");
   const resumen = laTxt(jac.quimicos_resumen || casa.quimicos_resumen || "");
   const alertas = laAlertas(casa);
 
@@ -209,37 +180,17 @@ function laRenderCasa(casa) {
 
   html += '<div class="la-jacuzzi' + (jTemp == null ? " empty" : "") + '"><div class="k">Jacuzzi</div><div class="v">' + esc(jV) + '</div><div class="s">' + esc(jSub) + "</div></div>";
 
-  if (chemRows.length) {
+  if (chemLines.length) {
     html += '<div class="la-chemlist">';
-    for (const row of chemRows) {
-      /* Plain string chem line */
-      if (row.line) {
-        html += '<div class="la-chemrow line"><span class="la-chemline">' + esc(row.line) + "</span></div>";
-        continue;
-      }
-      const st = String(row.estado || "").toLowerCase();
-      const hasVal = row.valor != null && row.valor !== "";
-      const badge = st ? ('<span class="la-badge ' + laBadgeClass(st) + '">' + esc(st) + "</span>") : "";
-      const primary = laDoseLine(row);
-      const needs = !laIsOk(st);
-      const canExpand = !!(primary && row.hacer && primary !== String(row.hacer).trim());
-      const doseLine = primary ? ('<span class="la-dose">' + esc(primary) + "</span>") : "";
-      const openBtn = canExpand ? '<button type="button" class="la-dose-tog" aria-expanded="false" title="Ver detalle">▾</button>' : "";
-      html += '<div class="la-chemrow' + (needs ? " needs" : "") + (canExpand ? " has-dose" : "") + '">';
-      html += '<span class="lab">' + esc(String(row.label || "")) + "</span>";
-      html += '<span class="val">' + (hasVal ? esc(String(row.valor)) : "—") + "</span>";
-      html += badge;
-      if (primary || canExpand) {
-        html += '<div class="la-dosewrap">' + doseLine + openBtn;
-        if (canExpand) html += '<div class="la-dose-detail" hidden>' + esc(String(row.hacer)) + "</div>";
-        html += "</div>";
-      }
-      html += "</div>";
+    for (const line of chemLines) {
+      const needs = /\b(alto|bajo|revisar)\b/i.test(line);
+      html += '<div class="la-chemrow line' + (needs ? " needs" : "") + '"><span class="la-chemline">' + esc(line) + "</span></div>";
     }
     html += "</div>";
   } else {
-    html += '<div class="la-chemlist empty"><div class="la-chemrow empty"><span class="lab">Químicos</span><span class="val">—</span><span class="la-accion">sin lectura</span></div></div>';
+    html += '<div class="la-chemlist empty"><div class="la-chemrow empty"><span class="la-chemline">Químicos — sin lectura</span></div></div>';
   }
+  if (jacNota) html += '<div class="la-note">' + esc(jacNota) + "</div>";
   if (resumen) html += '<div class="la-note">' + esc(resumen) + "</div>";
   if (alertas.length) {
     html += '<ul class="la-l la-alerts">' + alertas.map(t => '<li class="la-bad">' + esc(t) + "</li>").join("") + "</ul>";
